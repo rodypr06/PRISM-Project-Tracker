@@ -99,6 +99,37 @@ function initializeDatabase() {
     )
   `);
 
+  // Project notes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS project_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      is_markdown BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  // Note attachments table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS note_attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      note_id INTEGER NOT NULL,
+      filename TEXT NOT NULL,
+      original_filename TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      mime_type TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (note_id) REFERENCES project_notes(id) ON DELETE CASCADE
+    )
+  `);
+
   // Create indexes for performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
@@ -107,6 +138,8 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_comments_task_id ON comments(task_id);
     CREATE INDEX IF NOT EXISTS idx_comments_phase_id ON comments(phase_id);
     CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_project_notes_project_id ON project_notes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_note_attachments_note_id ON note_attachments(note_id);
   `);
 
   // Create default admin user if not exists

@@ -121,6 +121,12 @@ export const adminAPI = {
       method: 'DELETE',
     }),
 
+  reorderTasks: (phaseId, taskIds) =>
+    fetchAPI(`/api/admin/tasks/reorder/${phaseId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ taskIds }),
+    }),
+
   // Updates
   createUpdate: (updateData) =>
     fetchAPI('/api/admin/updates', {
@@ -155,6 +161,57 @@ export const commentsAPI = {
 
   deleteComment: (id) =>
     fetchAPI(`/api/comments/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Notes API
+export const notesAPI = {
+  getProjectNotes: (projectId) => fetchAPI(`/api/notes/project/${projectId}`),
+
+  createNote: (noteData) =>
+    fetchAPI('/api/notes', {
+      method: 'POST',
+      body: JSON.stringify(noteData),
+    }),
+
+  updateNote: (id, noteData) =>
+    fetchAPI(`/api/notes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(noteData),
+    }),
+
+  deleteNote: (id) =>
+    fetchAPI(`/api/notes/${id}`, {
+      method: 'DELETE',
+    }),
+
+  uploadAttachment: async (noteId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const url = `${API_URL}/api/notes/${noteId}/attachments`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new ApiError(data.error || 'Upload failed', response.status);
+    }
+
+    return data;
+  },
+
+  downloadAttachment: (attachmentId) => {
+    window.open(`${API_URL}/api/notes/attachments/${attachmentId}`, '_blank');
+  },
+
+  deleteAttachment: (attachmentId) =>
+    fetchAPI(`/api/notes/attachments/${attachmentId}`, {
       method: 'DELETE',
     }),
 };

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { adminAPI } from '@/utils/api';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ProgressBar from '@/components/shared/ProgressBar';
 import CommentSection from '@/components/shared/CommentSection';
+import NotesSection from '@/components/shared/NotesSection';
 import { cn } from '@/lib/utils';
 
 export default function ProjectManager({ project, client, onClose, onUpdate }) {
@@ -146,6 +148,38 @@ export default function ProjectManager({ project, client, onClose, onUpdate }) {
       if (onUpdate) onUpdate();
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleDragEnd = async (result, phaseId) => {
+    if (!result.destination) return;
+
+    const phase = projectData.phases.find(p => p.id === phaseId);
+    if (!phase || !phase.tasks) return;
+
+    const items = Array.from(phase.tasks);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    // Optimistically update UI
+    const updatedPhases = projectData.phases.map(p => {
+      if (p.id === phaseId) {
+        return { ...p, tasks: items };
+      }
+      return p;
+    });
+    setProjectData({ ...projectData, phases: updatedPhases });
+
+    // Send reorder request to backend
+    try {
+      const taskIds = items.map(task => task.id);
+      await adminAPI.reorderTasks(phaseId, taskIds);
+      await loadProject();
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      setError(err.message);
+      // Reload on error to get correct state
+      await loadProject();
     }
   };
 
@@ -390,75 +424,150 @@ export default function ProjectManager({ project, client, onClose, onUpdate }) {
                       </div>
 
                       {phase.tasks && phase.tasks.length > 0 ? (
-                        <div className="space-y-2">
-                          {phase.tasks.map((task, idx) => (
-                            <div
-                              key={task.id}
-                              className="bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-colors"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-gray-500 text-xs">#{idx + 1}</span>
-                                    <span className="text-white text-sm font-medium">{task.task_name}</span>
-                                  </div>
-
-                                  {task.notes && (
-                                    <p className="text-gray-400 text-xs mt-1">{task.notes}</p>
+                        viewMode === 'admin' ? (
+                          <DragDropContext onDragEnd={(result) => handleDragEnd(result, phase.id)}>
+                            <Droppable droppableId={`phase-${phase.id}`}>
+                              {(provided, snapshot) => (
+                                <div
+                                  {...provided.droppableProps}
+                                  ref={provided.innerRef}
+                                  className={cn(
+                                    "space-y-2 transition-colors rounded-lg",
+                                    snapshot.isDraggingOver && "bg-primary/5"
                                   )}
-
-                                  {task.due_date && (
-                                    <p className="text-gray-500 text-xs mt-1">
-                                      Due: {new Date(task.due_date).toLocaleDateString()}
-                                    </p>
-                                  )}
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                  <StatusBadge status={task.status} size="sm" />
-                                  {viewMode === 'admin' && (
-                                    <div className="flex gap-1">
-                                      <button
-                                        onClick={() => setEditingTask(task)}
-                                        className="text-primary hover:text-cyan-300 text-xs"
-                                        title="Edit"
-                                      >
-                                        ✏️
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteTask(task.id)}
-                                        className="text-rose-400 hover:text-rose-300 text-xs"
-                                        title="Delete"
-                                      >
-                                        🗑️
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Task Status Changer - Admin Only */}
-                              {viewMode === 'admin' && (
-                                <div className="flex gap-2 mt-3 flex-wrap">
-                                  {['Not Started', 'In Progress', 'Completed', 'Blocked'].map((status) => (
-                                    <button
-                                      key={status}
-                                      onClick={() => handleUpdateTaskStatus(task.id, status)}
-                                      className={cn(
-                                        'text-xs px-2 py-0.5 rounded border transition-all',
-                                        task.status === status
-                                          ? 'bg-primary/20 text-primary border-primary'
-                                          : 'bg-slate-800/50 text-gray-500 border-slate-700 hover:border-gray-600'
-                                      )}
+                                >
+                                  {phase.tasks.map((task, idx) => (
+                                    <Draggable
+                                      key={task.id}
+                                      draggableId={`task-${task.id}`}
+                                      index={idx}
                                     >
-                                      {status}
-                                    </button>
+                                      {(provided, snapshot) => (
+                                        <div
+                                          ref={provided.innerRef}
+                                          {...provided.draggableProps}
+                                          className={cn(
+                                            "bg-white/5 rounded-lg p-3 transition-all",
+                                            snapshot.isDragging
+                                              ? "shadow-lg shadow-primary/20 bg-white/10 scale-105"
+                                              : "hover:bg-white/10"
+                                          )}
+                                        >
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-2 flex-1">
+                                              {/* Drag Handle */}
+                                              <div
+                                                {...provided.dragHandleProps}
+                                                className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-primary transition-colors"
+                                              >
+                                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                  <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm0 4h2v2H9v-2zm0 4h2v2H9v-2zM13 3h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2zm0 4h2v2h-2v-2z" />
+                                                </svg>
+                                              </div>
+
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-1">
+                                                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-primary/20 to-cyan-500/20 border border-primary/30 flex-shrink-0">
+                                                    <span className="text-primary text-xs font-bold">{idx + 1}</span>
+                                                  </div>
+                                                  <span className="text-white text-sm font-medium">{task.task_name}</span>
+                                                </div>
+
+                                                {task.notes && (
+                                                  <p className="text-gray-400 text-xs mt-1">{task.notes}</p>
+                                                )}
+
+                                                {task.due_date && (
+                                                  <p className="text-gray-500 text-xs mt-1">
+                                                    Due: {new Date(task.due_date).toLocaleDateString()}
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                              <StatusBadge status={task.status} size="sm" />
+                                              <div className="flex gap-1">
+                                                <button
+                                                  onClick={() => setEditingTask(task)}
+                                                  className="text-primary hover:text-cyan-300 text-xs"
+                                                  title="Edit"
+                                                >
+                                                  ✏️
+                                                </button>
+                                                <button
+                                                  onClick={() => handleDeleteTask(task.id)}
+                                                  className="text-rose-400 hover:text-rose-300 text-xs"
+                                                  title="Delete"
+                                                >
+                                                  🗑️
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          {/* Task Status Changer */}
+                                          <div className="flex gap-2 mt-3 flex-wrap">
+                                            {['Not Started', 'In Progress', 'Completed', 'Blocked'].map((status) => (
+                                              <button
+                                                key={status}
+                                                onClick={() => handleUpdateTaskStatus(task.id, status)}
+                                                className={cn(
+                                                  'text-xs px-2 py-0.5 rounded border transition-all',
+                                                  task.status === status
+                                                    ? 'bg-primary/20 text-primary border-primary'
+                                                    : 'bg-slate-800/50 text-gray-500 border-slate-700 hover:border-gray-600'
+                                                )}
+                                              >
+                                                {status}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </Draggable>
                                   ))}
+                                  {provided.placeholder}
                                 </div>
                               )}
-                            </div>
-                          ))}
-                        </div>
+                            </Droppable>
+                          </DragDropContext>
+                        ) : (
+                          // Client view - no drag and drop
+                          <div className="space-y-2">
+                            {phase.tasks.map((task, idx) => (
+                              <div
+                                key={task.id}
+                                className="bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-1">
+                                      <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 flex-shrink-0">
+                                        <span className="text-cyan-300 text-xs font-bold">{idx + 1}</span>
+                                      </div>
+                                      <span className="text-white text-sm font-medium">{task.task_name}</span>
+                                    </div>
+
+                                    {task.notes && (
+                                      <p className="text-gray-400 text-xs mt-1">{task.notes}</p>
+                                    )}
+
+                                    {task.due_date && (
+                                      <p className="text-gray-500 text-xs mt-1">
+                                        Due: {new Date(task.due_date).toLocaleDateString()}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <StatusBadge status={task.status} size="sm" />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
                       ) : (
                         <p className="text-gray-500 text-sm italic">No tasks yet</p>
                       )}
@@ -504,6 +613,11 @@ export default function ProjectManager({ project, client, onClose, onUpdate }) {
             </AnimatePresence>
           </motion.div>
         ))}
+      </div>
+
+      {/* Project Notes Section */}
+      <div className="mt-8">
+        <NotesSection projectId={project.id} isAdminView={viewMode === 'admin'} />
       </div>
 
       {/* Add/Edit Task Modal */}

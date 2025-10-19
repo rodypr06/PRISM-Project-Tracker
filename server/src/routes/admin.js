@@ -367,6 +367,55 @@ router.put('/tasks/:id', (req, res) => {
   }
 });
 
+// Reorder tasks within a phase
+router.put('/tasks/reorder/:phaseId', (req, res) => {
+  try {
+    const schema = z.object({
+      taskIds: z.array(z.number()).min(1)
+    });
+
+    const { taskIds } = schema.parse(req.body);
+    const phaseId = parseInt(req.params.phaseId);
+
+    // Verify all tasks belong to the phase
+    const tasks = db.prepare(`
+      SELECT id FROM tasks WHERE phase_id = ?
+    `).all(phaseId);
+
+    const taskIdsInPhase = tasks.map(t => t.id);
+    const allTasksValid = taskIds.every(id => taskIdsInPhase.includes(id));
+
+    if (!allTasksValid) {
+      return res.status(400).json({ error: 'Some tasks do not belong to this phase' });
+    }
+
+    // Update task orders in a transaction
+    const reorderTasks = db.transaction(() => {
+      taskIds.forEach((taskId, index) => {
+        db.prepare(`
+          UPDATE tasks SET task_order = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(index + 1, taskId);
+      });
+    });
+
+    reorderTasks();
+
+    // Return updated tasks
+    const updatedTasks = db.prepare(`
+      SELECT * FROM tasks WHERE phase_id = ? ORDER BY task_order
+    `).all(phaseId);
+
+    res.json({ tasks: updatedTasks });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    console.error('Reorder tasks error:', error);
+    res.status(500).json({ error: 'Failed to reorder tasks' });
+  }
+});
+
 // Delete task
 router.delete('/tasks/:id', (req, res) => {
   try {

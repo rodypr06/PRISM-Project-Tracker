@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { clientAPI } from '../../utils/api';
+import NotesSection from '../shared/NotesSection';
 
 export default function ClientDashboard() {
   const { user, logout } = useAuth();
@@ -119,6 +120,11 @@ export default function ClientDashboard() {
             </div>
           </div>
 
+          {/* Project Notes Section */}
+          <div className="glass-dark rounded-2xl p-6 animate-fade-in">
+            <NotesSection projectId={project.id} isAdminView={false} />
+          </div>
+
           {/* Phases */}
           <div className="space-y-5">
             {project.phases?.map((phase, index) => {
@@ -205,15 +211,22 @@ export default function ClientDashboard() {
                                 key={task.id}
                                 className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 hover:bg-slate-800/50 transition-colors group"
                               >
-                                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                                  task.status === 'Completed' ? 'bg-emerald-400 shadow-lg shadow-emerald-500/50' :
-                                  task.status === 'In Progress' ? 'bg-amber-400 shadow-lg shadow-amber-500/50 animate-pulse' :
-                                  task.status === 'Blocked' ? 'bg-rose-400 shadow-lg shadow-rose-500/50' :
-                                  'bg-gray-500'
-                                }`}></div>
-                                <span className="text-gray-200 flex-1 group-hover:text-white transition-colors">
-                                  {task.task_name}
-                                </span>
+                                <div className="flex items-center gap-3 flex-1">
+                                  <div className={`flex items-center justify-center w-7 h-7 rounded-lg flex-shrink-0 font-bold text-xs border transition-all group-hover:scale-110 ${
+                                    task.status === 'Completed'
+                                      ? 'bg-gradient-to-br from-emerald-500/20 to-green-500/20 border-emerald-500/40 text-emerald-300 shadow-lg shadow-emerald-500/20'
+                                      : task.status === 'In Progress'
+                                      ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-amber-500/40 text-amber-300 shadow-lg shadow-amber-500/20 animate-pulse'
+                                      : task.status === 'Blocked'
+                                      ? 'bg-gradient-to-br from-rose-500/20 to-red-500/20 border-rose-500/40 text-rose-300 shadow-lg shadow-rose-500/20'
+                                      : 'bg-gradient-to-br from-slate-700/50 to-slate-600/50 border-slate-600/50 text-gray-400'
+                                  }`}>
+                                    {taskIndex + 1}
+                                  </div>
+                                  <span className="text-gray-200 group-hover:text-white transition-colors">
+                                    {task.task_name}
+                                  </span>
+                                </div>
                                 <span className={`text-xs font-medium px-2 py-1 rounded ${
                                   task.status === 'Completed' ? 'text-emerald-400' :
                                   task.status === 'In Progress' ? 'text-amber-400' :

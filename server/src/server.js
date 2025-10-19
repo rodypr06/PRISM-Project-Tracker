@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import clientRoutes from './routes/client.js';
 import commentsRoutes from './routes/comments.js';
+import notesRoutes from './routes/notes.js';
 
 // Load environment variables
 dotenv.config();
@@ -73,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/client', clientRoutes);
 app.use('/api/comments', commentsRoutes);
+app.use('/api/notes', notesRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -5,6 +5,7 @@ import { clientAPI } from '@/utils/api';
 import StatusBadge from '@/components/shared/StatusBadge';
 import ProgressBar from '@/components/shared/ProgressBar';
 import CommentSection from '@/components/shared/CommentSection';
+import NotesSection from '@/components/shared/NotesSection';
 import { cn } from '@/lib/utils';
 
 export default function EnhancedClientDashboard() {
@@ -159,6 +160,16 @@ export default function EnhancedClientDashboard() {
             </div>
           </motion.div>
 
+          {/* Project Notes Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="glass rounded-xl p-6 mb-6"
+          >
+            <NotesSection projectId={project.id} isAdminView={false} />
+          </motion.div>
+
           {/* Phases */}
           <div className="space-y-4">
             {project.phases?.map((phase, index) => (
@@ -177,6 +188,18 @@ export default function EnhancedClientDashboard() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
+                        <div className={cn(
+                          "flex items-center justify-center w-8 h-8 rounded-lg font-bold text-sm flex-shrink-0",
+                          phase.status === 'Completed'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                            : phase.status === 'In Progress'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                            : phase.status === 'Blocked'
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                            : 'bg-slate-700/50 text-gray-400 border border-slate-600/50'
+                        )}>
+                          {phase.phase_number}
+                        </div>
                         <h3 className="text-lg font-semibold text-white">{phase.phase_name}</h3>
                         <StatusBadge status={phase.status} size="sm" />
                       </div>
