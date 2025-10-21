@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ollama Web UI</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #chat { max-width: 900px; margin: auto; }
+    .msg { padding: 8px; border-radius: 4px; margin: 6px 0; white-space: pre-wrap; }
+    .user { background: #e6f3ff; text-align: right; }
+    .bot { background: #f0f0f0; text-align: left; }
+    textarea { width: 100%; height: 120px; }
+    button { padding: 8px 16px; margin-top: 8px; }
+    #controls { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <h2>Ollama Web UI</h2>
+
+    <div id="controls">
+      <label for="model">Model:</label>
+      <select id="model"><option>Loading...</option></select>
+
+      <label for="max_tokens">Max tokens:</label>
+      <input id="max_tokens" type="number" value="512" min="1" style="width:100px"/>
+
+      <button id="refreshModels">Refresh</button>
+    </div>
+
+    <div id="messages" aria-live="polite"></div>
+
+    <textarea id="prompt" placeholder="Type your prompt here..."></textarea>
+    <br/>
+    <button id="send">Send</button>
+    <p style="color:#666;font-size:0.9em">This UI proxies requests to /api/chat on the server and loads models from /api/models.</p>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const promptEl = document.getElementById('prompt');
+    const sendBtn = document.getElementById('send');
+    const modelSelect = document.getElementById('model');
+    const refreshBtn = document.getElementById('refreshModels');
+    const maxTokensEl = document.getElementById('max_tokens');
+
+    function addMessage(text, cls) {
+      const d = document.createElement('div');
+      d.className = 'msg ' + cls;
+      d.textContent = text;
+      messagesEl.appendChild(d);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    async function loadModels() {
+      modelSelect.disabled = true;
+      modelSelect.innerHTML = '<option>Loading...</option>';
+      try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+        modelSelect.disabled = false;
+        modelSelect.innerHTML = '';
+        if (Array.isArray(data.models) && data.models.length) {
+          data.models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            modelSelect.appendChild(opt);
+          });
+        } else {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'No models found';
+          modelSelect.appendChild(opt);
+        }
+      } catch (err) {
+        modelSelect.disabled = false;
+        modelSelect.innerHTML = '<option>Error loading models</option>';
+      }
+    }
+
+    async function send() {
+      const prompt = promptEl.value.trim();
+      if (!prompt) return;
+      addMessage(prompt, 'user');
+      promptEl.value = '';
+      const placeholder = document.createElement('div');
+      placeholder.className = 'msg bot';
+      placeholder.textContent = 'Thinking...';
+      messagesEl.appendChild(placeholder);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      const payload = {
+        prompt,
+        model: modelSelect.value || undefined,
+        max_tokens: Number(maxTokensEl.value) || undefined
+      };
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await res.text();
+        placeholder.remove();
+        if (res.ok) {
+          addMessage(text, 'bot');
+        } else {
+          addMessage('Error: ' + text, 'bot');
+        }
+      } catch (err) {
+        placeholder.remove();
+        addMessage('Network error: ' + err.message, 'bot');
+      }
+    }
+
+    sendBtn.addEventListener('click', send);
+    promptEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.shiftKey === false)) {
+        e.preventDefault(); send();
+      }
+    });
+    refreshBtn.addEventListener('click', loadModels);
+
+    // load models on startup
+    loadModels();
+  </script>
+</body>
+</html>
